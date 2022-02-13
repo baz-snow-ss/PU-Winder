@@ -1,6 +1,8 @@
 # PU-Winder
 Automated Guitar Pick up winder
 
+https://github.com/baz-snow-ss/PU-Winder/discussions/1
+
 <h3>The Goal is make an automated guitar pick up winder.</h3>
 
 <p>12/24 V DC Motor 2000/2500 RPM  -- geared 3:1   T60/T20 </p>
