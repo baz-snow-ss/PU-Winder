@@ -21,7 +21,7 @@ Automated Guitar Pick up winder
 <p>Arduino Mega 2560 -- I dont think the Arduino if powerful enough to keep track of the encoder it losing steps</p>
 ---------------------------------------------------------------------------------
 <p>Bobbin 7 mm Width</p>
-<p>copper winding Wire 43 AGW -- 0.0024" -- 0.0635 mm
+<p>copper winding Wire 43 AWG -- 0.0024" -- 0.0635 mm
 Single coil is approx 5000 Turns approx.
 P90 coil is 10,000 turns approx.</P>
 
