@@ -15,6 +15,7 @@ Automated Guitar Pick up winder
 ---------------------------------------------------------------------------------
 
 <p><h3>MPU's</h3></p>
+<p>I need help to write code for the F28069M board</p>
 <p>TI LaunchXL F28069M</p>
 <p>STM32 Backpill</p>
 <p>Arduino Mega 2560 -- I dont think the Arduino if powerful enough to keep track of the encoder it losing steps</p>
