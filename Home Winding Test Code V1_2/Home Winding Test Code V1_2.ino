@@ -32,6 +32,7 @@ volatile int motorMaxRPM = 1600;
 volatile int stepperAcceleration = 320;           //for setAcceleration
 volatile float stepperSpeed = 0.0;                //speed of feeder in turns per second. It will be recalculated before winding
 int layerToDo = 0;
+static int layers = 0;                            // Keeps Trac of the layers Done.
 int feederMicroStepping = 1600;
 const int leadScrewPitch = 5.0;                   // Lead Screw pitch in MM
 
@@ -266,6 +267,7 @@ void winding(){
           stepper.run();
       }else{
         layerToDo++;
+        layers++;
       }
   }
   //Second Offset
@@ -276,6 +278,7 @@ void winding(){
           stepper.run();
       }else{
         layerToDo--;
+        layers++;
       }
   }
 
