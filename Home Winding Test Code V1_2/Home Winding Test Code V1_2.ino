@@ -293,7 +293,10 @@ void winding(){
     Serial.print("\tTachometer: ");
     Serial.print(RPM);
     Serial.print("    StepperSpeed ");
-    Serial.println(stepperSpeed);
+    Serial.print(stepperSpeed);
+    Serial.print(layers);
+    Serial.print("    Layers: ");
+    Serial.println();
   }
   #endif
 
