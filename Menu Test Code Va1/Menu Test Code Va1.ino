@@ -1,8 +1,8 @@
 /*
 
-    OLED display - i2c version SSD1306
-    128x64
-    Notes:   text size 1 = 21 x 8 characters on the larger oLED display
+    OLED display - SPI ST7735S
+    160x128
+    Notes:   text size 1 = 21 x 8
              text size 2 = 10 x 4
              text size 3 = 
     --------------------------------------------------------------------
@@ -249,11 +249,6 @@ void menuActions() {
       displayMessage("Message", "This is\n Run Screen");
     }
 
-    // turn menu/oLED off
-    else if (oMenu.selectedMenuItem == 4) {
-      resetMenu();    // turn menus off
-    }
-
     oMenu.selectedMenuItem = 0;                // clear menu item selected flag
   }
 
@@ -422,8 +417,8 @@ void menuValues() {
 }
 int serviceValue() {
 
-   const int _valueSpacingX = 30;  // spacing for the displayed value x position
-   const int _valueSpacingY = 5;   // spacing for the displayed value y position
+   const int valueSpacingX = 30;  // spacing for the displayed value x position
+   const int valueSpacingY = 5;   // spacing for the displayed value y position
 
    uint32_t tTime;
 
@@ -461,7 +456,7 @@ int serviceValue() {
    display.drawLine(0, topLine - 1, display.width(), topLine - 1, White);  // draw horizontal line under title
 
    // value selected
-   display.setCursor(_valueSpacingX, topLine + _valueSpacingY);
+   display.setCursor(valueSpacingX, topLine + valueSpacingY);
    display.setTextSize(3);
    display.println(oMenu.mValueEntered);
 
@@ -508,10 +503,8 @@ void setup() {
     rEnc.encoder0Pos = 0;
     attachInterrupt(digitalPinToInterrupt(encoder0PinA), doEncoder, CHANGE);
 
-  //defaultMenu();       // start the default menu
-
   // display greeting message - pressing button will start menu
-    displayMessage("STARTED", "Pick Up\n Winder\n V1.0");
+    displayMessage("Loading...", "Pick Up\n Winder\n V1.0 (c)");
 }
 //========================================
 
@@ -536,11 +529,11 @@ void loop() {
         subMenuActions();
         break;
 
-      // if there is an active none blocking 'enter value'
+      // if active 'enter value'
       case value:
         serviceValue();
         if (rEnc.reButtonPressed) {                        // if the button has been pressed
-          menuValues();                                             // a value has been entered so action it
+          menuValues();                                    // a value has been entered so action it
           break;
         }
 
