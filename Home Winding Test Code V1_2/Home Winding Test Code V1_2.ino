@@ -3,6 +3,7 @@
 #include <AccelStepper.h>
 #include <LiquidCrystal_I2C.h> // Library for LCD
 #include <digitalWriteFast.h>
+#include <L298.h>
 
 //=== Variable ===
 //#define DEBUG                                  // Uncomment to Debug Serial
@@ -15,11 +16,22 @@ const String main_version = "1.0";
 LiquidCrystal_I2C lcd = LiquidCrystal_I2C(0x27, 20, 4); // LCD(0x27,16,2) (Adress, Rows, Columns)
 
 //====== Motor =============
-const unsigned int MOTOR_DIR = 51;                // Set the rotation of LOW CCW HIGH CW
-const unsigned int MOTOR_PWM = 13;                // PWM 0-254 H-Bridge can only Run 99% Duty
-const unsigned int MOTOR_ENA = 50;                // output pin for motor relay
-volatile unsigned int currentWinds  = 0;          // current count of winds
-static unsigned int desiredWinds = 1000;          // default number of winds to perform
+const int MOTOR_IN1 = 30;                         // (IN1, IN2) stop 0,0 float 1,1  Forward 1,0 Reverse 0,1
+const int MOTOR_IN2 = 32;                         //
+const int MOTOR_ENA1 = 12;                        // PWM 0-254 H-Bridge
+volatile int currentWinds  = 0;                   // current count of winds
+static int desiredWinds = 1000;                   // default number of winds to perform
+long tDelay = 1000;
+unsigned long timeNow = 0;
+const int maxRPM = 1100;
+int toPWM = 0;
+int rpm = 0;
+int pwm = 0;
+int direction = 1;                                 // 1=CW 0=CCW
+bool isPause = 0;                               // Check the pause switch on/off   TRUE/FALSE
+L298 motor(MOTOR_IN1, MOTOR_IN2, MOTOR_ENA1);
+
+String runMode = "Run";
 
 //***=== Winder Motor ===***
 const int DIR_PIN = 22;                           // The direction pin controls the direction of stepper motor rotation.
@@ -27,12 +39,12 @@ const int PUL_PIN = 23;                           // Each pulse on the STEP pin 
 const int S_ENABLE_PIN = 24;                      // Enable/Disable the stepper Driver
 // Define a stepper and the pins it will use
 AccelStepper stepper( 1, PUL_PIN, DIR_PIN);       //(Mode, Pul, Dir) Mode 1 = Driver Interface, SETP, CW CCW,
-volatile int stepperMaxSpeed = 1500;              //for setMaxSpeed - steps (1 turn/sec or 60 rpm)
-volatile int motorMaxRPM = 1600;
+
+volatile int stepperMaxSpeed = 1600;              //for setMaxSpeed - steps (1 turn/sec or 60 rpm)
+volatile int motorMaxRPM = 2400;
 volatile int stepperAcceleration = 320;           //for setAcceleration
 volatile float stepperSpeed = 0.0;                //speed of feeder in turns per second. It will be recalculated before winding
 int layerToDo = 0;
-static int layers = 0;                            // Keeps Trac of the layers Done.
 int feederMicroStepping = 1600;
 const int leadScrewPitch = 5.0;                   // Lead Screw pitch in MM
 
@@ -45,8 +57,8 @@ bool autoWinding_enabled = true;                  //Lets the code know if it sho
  int homePos = 8000;                              // Working Offset Home (steps) / 320 = mm
 
 // Define the Limit swtichs / Pins used
-const int homeSwitch = 53;                       // Pin connected to Home Switch (MicroSwitch)
-const int endLimit = 52;
+const int homeSwitch = 34;                       // Pin connected to Home Switch (MicroSwitch)
+const int endLimit = 33;
 bool isAlarm = 0;
 
 // Homing Variable 
@@ -95,18 +107,13 @@ void setup()
   lcd.init();
   lcd.backlight();
   lcd.clear();
-  splashScreen();
 
+  //TCCR0B = TCCR0B & B11111000 | B00000010; // for PWM frequency of 7812.50 Hz PIN D4 and D13
+  //TCCR1B = TCCR1B  & 0b11111000 | 0x02;
   //Run the Homing Procedure..
   homming();                                        
   //=== Tach ===
-  attachInterrupt(digitalPinToInterrupt(tachPin), Pulse_Event, RISING);  // Enable interruption pin 2 when going from LOW to HIGH.
-  //
-  //=== Motor ===
-  pinMode (MOTOR_DIR, OUTPUT);
-  pinMode (MOTOR_PWM, OUTPUT);
-  pinMode (MOTOR_ENA, OUTPUT);
-  digitalWrite (MOTOR_ENA, LOW);
+  attachInterrupt(digitalPinToInterrupt(tachPin), Pulse_Event, RISING);  // Enable interruption pin 2 when going from LOW to HIGH. RISING
 
 } //Setup
 //=========================================================//
@@ -160,67 +167,51 @@ void homming(){
   lcd.print ("Ready to Run");
 }
 //=========================================================//
-void clearLCDLine(int line)        //Clear the LCD line
-{               
-  lcd.setCursor(0,line);
-  int col = 20;
-  for(int n = 0; n < col; n++)     // 20 indicates symbols in line. For 2x16 LCD write - 16
-    {
-      lcd.print(" ");
+
+int rampUp(int maxpwm){
+  if(millis() >= timeNow + tDelay){                          // Check the interval time for the pwm ramp up
+    timeNow += tDelay;                                         
+    if( pwm < maxpwm){pwm ++;}                               // Ramp up until desire PWM is reached
+    pwm = constrain(pwm, 0, maxpwm);                         // Make sure to stay in bounds 
+  }
+  return pwm;
+}
+
+void runTheMotor(int isDirection){                            // function for the motor
+   
+  if(runMode == "Run" && isPause == false){
+    if(currentWinds <= desiredWinds && isAlarm == false){     // Check if  the winds are finish or there's an alarm 
+
+      toPWM = 50;
+      rampUp(toPWM);
+
+      if(isDirection == CW){                                   // Did you want to move Forward
+        motor.Forward(pwm);
+      }
+      else if(isDirection == CCW){                             // Did you want to move in Reverse
+        motor.Reverse(pwm);
+      }
+      
+      winding();                                               // Run the Stepper whit the Motor
+
+      #ifdef DEBUG
+      Serial.print(currentWinds);
+      #endif 
     }
-}
 
-void splashScreen(){
- 
-  printLCD(0, 0, " SS Angryguy Winder ");
-  printLCD(1, 0, " version " + main_version);
-  printLCD(3, 3, "(c) Angryguy");
-  
-  delay(2000);                      // Show it for 2 Seconds
-  lcd.clear();
-}
-
-void printLCD(int row, int col, String message) {
-  
-  for (int i = col; i <= message.length(); i++)
-  {    
-    lcd.setCursor(row, col);
-    lcd.print(message.substring(row, i));
+    if( currentWinds >= desiredWinds )                          // If we reached the turn count then
+    {
+      motor.Stop();                                             // Stop and Disable the Motor
+      motor.Disable();
+      #ifdef DEBUG
+      Serial.print("DONE! Winding ");
+      #endif 
+      currentWinds  = 0;                                        // Reset turn count for the next wind
+      runMode = "Main";                                         // Reset the runMode.
+    }
+      
   }
-}
-
-void runTheMotor(){                              // function for the motor
-//if (digitalRead(PAUSE_PIN) == LOW)  {
-  int pwm = 255;
-  if(currentWinds <= desiredWinds && isAlarm == false){
-
-    if(pwm > 254) pwm = 254;
-    analogWrite(MOTOR_PWM, pwm);
-    digitalWrite(MOTOR_ENA, HIGH);              // enable the motor
-    digitalWrite(MOTOR_DIR, 0);                 // Set the rotation of motor LOW(0) CCW --  HIGH(1) CW
-
-    winding();                                  // Run the Stepper whit the Motor
-
-    #ifdef DEBUG
-    Serial.print(currentWinds);
-    #endif 
-  }
-
-  if( currentWinds >= desiredWinds )  
-      {
-        digitalWrite(MOTOR_ENA, LOW);           // stop winding
-        #ifdef DEBUG
-        Serial.print("DONE! Winding ");
-        #endif 
-  }
-    // currentWinds  = 0;
-
-}
-
-void direction(byte isDir){
-  digitalWrite(DIR_PIN, (isDir ? HIGH : LOW));
-  //PORTL ^= bit(PA1);
-}
+}//
 
 void winding(){
  //run() moveTo() move() setSpeed() distanceToGo()  targetPosition() currentPosition()
@@ -235,7 +226,7 @@ void winding(){
  int firstPos = homePos  + totalStepsPerLayer;    
  int secondPos = firstPos - totalStepsPerLayer; 
 
- //=====Tach======================================= 
+  //=====Tach======================================= 
   LastTimeCycleMeasure = LastTimeWeMeasured;               // Store the LastTimeWeMeasured in a variable.
   CurrentMicros = micros();                                // Store the micros() in a variable.
   if(CurrentMicros < LastTimeCycleMeasure) { LastTimeCycleMeasure = CurrentMicros; }
@@ -253,32 +244,30 @@ void winding(){
   RPM = FrequencyRaw / PulsesPerRevolution * 60;  
   RPM = RPM / 10000;                                     // Remove the decimals.
 
-    float stepperSpeed = map(RPM, 0, motorMaxRPM, 0, stepperMaxSpeed);
-    if(stepperSpeed > stepperMaxSpeed){
-      stepperSpeed = stepperMaxSpeed;
-    }
+  float stepperSpeed = map(RPM, 0, motorMaxRPM, 0, stepperMaxSpeed);
+  if(stepperSpeed > stepperMaxSpeed){                   
+    stepperSpeed = stepperMaxSpeed;                    // Map the Motor RPM to the Stepper movement speed
+  }
 
- //================================================
+  //================================================
   //First Offset
-  if(layerToDo == 0){
-      if(stepper.currentPosition() != firstPos){
-          stepper.move(totalStepsPerLayer);
-          stepper.setSpeed(stepperSpeed);
-          stepper.run();
+  if(layerToDo == 0){                                   // 0 = from left to right +
+      if(stepper.currentPosition() != firstPos){        // Check where to move to
+          stepper.move(totalStepsPerLayer);             // Count the steps to Fill from left to right +
+          stepper.setSpeed(stepperSpeed);               // Set the movement speed
+          stepper.run();                                // Now go and do it 
       }else{
-        layerToDo++;
-        layers++;
+        layerToDo++;                                    // if the layer is done move the other way
       }
   }
   //Second Offset
-  if(layerToDo == 1){
+  if(layerToDo == 1){                                    // 1 = from right to left -
       if(stepper.currentPosition() != secondPos){
-          stepper.move(-totalStepsPerLayer);
+          stepper.move(-totalStepsPerLayer);             // Count the steps to Fill from right to left -
           stepper.setSpeed(-stepperSpeed);
           stepper.run();
       }else{
-        layerToDo--;
-        layers++;
+        layerToDo--;                                     // if the layer is done move the other way
       }
   }
 
@@ -293,10 +282,7 @@ void winding(){
     Serial.print("\tTachometer: ");
     Serial.print(RPM);
     Serial.print("    StepperSpeed ");
-    Serial.print(stepperSpeed);
-    Serial.print(layers);
-    Serial.print("    Layers: ");
-    Serial.println();
+    Serial.println(stepperSpeed);
   }
   #endif
 
@@ -307,13 +293,13 @@ void winding(){
 void Pulse_Event()  // The interrupt runs this to calculate the period between pulses:
 {
 
-  PeriodBetweenPulses = micros() - LastTimeWeMeasured;  // Current "micros" minus the old "micros" when the last pulse happens.
-                                                        // This will result with the period (microseconds) between both pulses.
-                                                        // The way is made, the overflow of the "micros" is not going to cause any issue.
-
-  LastTimeWeMeasured = micros();  // Stores the current micros so the next time we have a pulse we would have something to compare with.
-
-  if(PulseCounter >= AmountOfReadings)  // If counter for amount of readings reach the set limit:
+  PeriodBetweenPulses = micros() - LastTimeWeMeasured; 
+  // Current "micros" minus the old "micros" when the last pulse happens.
+  // This will result with the period (microseconds) between both pulses.
+  // The way is made, the overflow of the "micros" is not going to cause any issue.
+  LastTimeWeMeasured = micros();  
+  // Stores the current micros so the next time we have a pulse we would have something to compare with.
+  if(PulseCounter >= AmountOfReadings)             // If counter for amount of readings reach the set limit:
   {
     PeriodAverage = PeriodSum / AmountOfReadings;  // Calculate the final period dividing the sum of all readings by the
                                                    // amount of readings to get the average.
@@ -328,10 +314,13 @@ void Pulse_Event()  // The interrupt runs this to calculate the period between p
     // Remap period to the amount of readings:
     int RemapedAmountOfReadings = map(PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
     // 1st value is what are we going to remap. In this case is the PeriodBetweenPulses.
-    // 2nd value is the period value when we are going to have only 1 reading. The higher it is, the lower RPM has to be to reach 1 reading.
-    // 3rd value is the period value when we are going to have 10 readings. The higher it is, the lower RPM has to be to reach 10 readings.
+    // 2nd value is the period value when we are going to have only 1 reading. 
+    //    The higher it is, the lower RPM has to be to reach 1 reading.
+    // 3rd value is the period value when we are going to have 10 readings. 
+    //    The higher it is, the lower RPM has to be to reach 10 readings.
     // 4th and 5th values are the amount of readings range.
-    RemapedAmountOfReadings = constrain(RemapedAmountOfReadings, 1, 10);  // Constrain the value so it doesn't go below or above the limits.
+    RemapedAmountOfReadings = constrain(RemapedAmountOfReadings, 1, 10);  
+    // Constrain the value so it doesn't go below or above the limits.
     AmountOfReadings = RemapedAmountOfReadings;  // Set amount of readings as the remaped value.
   }
   else
@@ -358,16 +347,16 @@ void loop()
     #endif
     stepper.stop();
     stepper.disableOutputs();
-    analogWrite(MOTOR_PWM, 0);                  // Stop the Motor, PWM 0, and ENA1 = Brake 
-    digitalWrite(MOTOR_ENA, 1);                 // Disable Motor
+    motor.Stop();
+    motor.Disable();
     //delayMicroseconds(2000);
     // exit the loop just incase
     //exit(0);  //0 is required to prevent error.
   }
   else{
-    if(!isAlarm){runTheMotor();}
+    if(!isAlarm){runTheMotor(direction);}
   }
-  
+ // runTheMotor();
 
 
 
