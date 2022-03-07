@@ -5,8 +5,8 @@ https://github.com/baz-snow-ss/PU-Winder/discussions/1
 
 <h3>The Goal is make an automated guitar pick up winder.</h3>
 
-<p>12/24 V DC Motor 2000/2500 RPM  -- geared 3:1   T60/T20 </p>
-<p>H-Bridge Driver - whit ENA, DIR, PWM pins </p>
+<p>12/24 V DC Motor 1150/2450 RPM  -- geared 3:1   T60/T20 </p>
+<p>H-Bridge Driver - whit ENA1(pwm), IN1, IN2 </p>
 <p>600 P/R Quadrature Encoder A, B, 5v, Gnd -- Resolution 2400 lines/pulse's</p>
 
 <p>Stepper Motor 1.8' 200 Steps -- 8 Microstepping -- 1600 Microsteps </p>
