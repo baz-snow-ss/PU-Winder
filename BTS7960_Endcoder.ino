@@ -77,17 +77,17 @@ void setPWMfrequency(int freq) {              // Mega2560
     TCCR2B = (TCCR2B & 0b11111000) | freq; //31.37255 [kHz]
 }
 
-void enableDirection(char direction, boolean is){
-  if(direction == 'R') { digitalWrite(MOTOR_ENAR,is); }
-  if(direction == 'L') { digitalWrite(MOTOR_ENAL,is); }
+void enableDirection(String direction, boolean is){
+  if(direction == "CW") { digitalWrite(MOTOR_ENAR,is); }
+  if(direction == "CCW") { digitalWrite(MOTOR_ENAL,is); }
 }
-void setMotor(char direction, byte pwm){
-  if(direction == 'R'){ analogWrite(MOTOR_RPWM, pwm); }
-  if(direction == 'L'){ analogWrite(MOTOR_LPWM, pwm); }
+void setMotor(String direction, byte pwm){
+  if(direction == "CW"){ analogWrite(MOTOR_RPWM, pwm); }
+  if(direction == "CCW"){ analogWrite(MOTOR_LPWM, pwm); }
 }
-void stopMotor(char direction){
-  if(direction == 'R'){ digitalWrite(MOTOR_RPWM, LOW); }
-  if(direction == 'L'){ digitalWrite(MOTOR_LPWM, LOW); }
+void stopMotor(String direction){
+  if(direction == "CW"){ digitalWrite(MOTOR_RPWM, LOW); }
+  if(direction == "CCW"){ digitalWrite(MOTOR_LPWM, LOW); }
 
 }
 
@@ -123,8 +123,8 @@ void setup() {
   digitalWrite(MOTOR_RPWM, LOW);
   digitalWrite(MOTOR_LPWM, LOW); 
   setPWMfrequency(0x01);            // /31.37255 [kHz]
-  enableDirection('R', true);
-  enableDirection('L', true);
+  enableDirection("CW", true);
+  enableDirection("CCW", true);
 
   //***=== Endcoder =======================***
   pinMode(ENCZ_PIN, INPUT_PULLUP);
@@ -168,7 +168,7 @@ void pulIsr() {
 void loop() {
   trackEnc();
   trackPul();
-  setMotor('L', 70);
+  setMotor("CCW", 70);
 
 }
 //***======================================***
